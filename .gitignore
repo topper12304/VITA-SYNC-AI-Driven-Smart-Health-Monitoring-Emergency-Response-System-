@@ -1,0 +1,22 @@
+# Maven build output
+target/
+
+# Logs
+logs/
+*.log
+
+# IDE files
+.idea/
+*.iml
+.vscode/
+*.classpath
+*.project
+.settings/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Sensitive config — keep db.properties but exclude if it has real passwords
+# Uncomment below if you want to exclude it:
+# src/main/resources/db.properties

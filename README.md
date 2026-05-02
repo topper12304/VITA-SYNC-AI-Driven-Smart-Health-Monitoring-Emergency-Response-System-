@@ -1,18 +1,42 @@
-# ⚡ VITA-SYNC — Smart Health Monitoring System
+# ⚡ VITA-SYNC + VITAL-CONNECT — Integrated Smart Hospital System
 
-A real-time patient vital sign monitoring and triage system built in Java 17 with a JavaFX dashboard.
+A real-time patient vital sign monitoring and emergency management system built entirely in **Java 17** with a **JavaFX** dashboard. Evolved from a 3rd-semester C-based hospital management system (VITAL-CONNECT) into a full-stack Java application with login, analytics, and emergency dispatch.
 
 ---
 
 ## What it does
 
-- Monitors Heart Rate (HR) and SpO2 for multiple patients simultaneously
-- Automatically detects critical conditions (bradycardia, tachycardia, hypoxemia)
-- Ranks patients by health criticality using a stability scoring algorithm
-- Manages hospital bed allocation
-- Supports admitting and discharging patients at runtime
-- Persists all data to MySQL with in-memory caching for speed
-- Displays everything live in a dark-themed JavaFX dashboard
+- **Doctor Login** — secure SHA-256 authenticated login before accessing the dashboard
+- **Real-time Monitoring** — HR and SpO2 for multiple patients simultaneously (every 1.5 sec)
+- **Search & Filter** — search patients by ID or name, filter by CRITICAL / WARNING / STABLE
+- **Critical Vital Detection** — auto-detects bradycardia, tachycardia, hypoxemia
+- **Auto Doctor Assignment** — when a patient goes CRITICAL, an available doctor is auto-assigned
+- **Emergency Triage** — ranks patients by health criticality using NEWS2-based stability scoring
+- **Emergency Request Management** — raise ER requests manually or automatically; track status PENDING → DISPATCHED → RESOLVED; stored in MySQL
+- **Discharge Summary** — on patient discharge, generates a full summary (avg HR, SpO2, critical events, doctor, duration) in a popup window
+- **Analytics Dashboard** — live hospital-wide stats: total patients, critical/stable/warning counts, free beds, ER pending, low stock alerts, top 5 critical patients
+- **Bed Management** — real-time bed allocation and release
+- **Doctor Management** — add doctors, view availability, assign to patients (Hash Table)
+- **Inventory Management** — medicine/supply stock with add, restock, dispense; low stock warnings (BST / TreeMap)
+- **Patient Admission/Discharge** — full lifecycle management with doctor assignment
+- **MySQL Persistence** — all data stored in MySQL with in-memory caching for speed
+- **Alert History** — timestamped log of all critical vital events
+
+---
+
+## Evolution from VITAL-CONNECT (3rd Sem C Project)
+
+| VITAL-CONNECT (C)             | VITA-SYNC (Java — Current)                       |
+|-------------------------------|--------------------------------------------------|
+| Priority Queue (Linked List)  | `PriorityBlockingQueue<PatientPriority>`         |
+| Hash Table for Doctors        | `ConcurrentHashMap<username, Doctor>`            |
+| BST for Inventory             | `TreeMap<itemId, InventoryItem>`                 |
+| Room Management (Array)       | `BedManager` with `ConcurrentHashMap`            |
+| File Handling (`.dat`)        | MySQL 8 + HikariCP connection pool               |
+| Console UI                    | JavaFX dark-themed dashboard (9 tabs)            |
+| No authentication             | SHA-256 Doctor Login Screen                      |
+| No emergency tracking         | Full ER Request lifecycle (DB-backed)            |
+| No analytics                  | Live Analytics Dashboard with stat cards         |
 
 ---
 
@@ -20,67 +44,81 @@ A real-time patient vital sign monitoring and triage system built in Java 17 wit
 
 ```
 src/main/java/com/vitasync/
-├── Main.java                        # Entry point — launches JavaFX app
+├── Main.java                            # Entry point — wires all components
 ├── model/
-│   ├── PatientRecord.java           # Patient data + vital history
-│   ├── VitalSignReading.java        # Immutable single reading snapshot
-│   ├── PatientPriority.java         # Comparable priority entry
-│   └── Bed.java                     # Hospital bed (FREE / OCCUPIED)
+│   ├── PatientRecord.java               # Patient data + vital history
+│   ├── VitalSignReading.java            # Immutable single reading snapshot
+│   ├── PatientPriority.java             # Comparable priority entry
+│   ├── Bed.java                         # Hospital bed (FREE / OCCUPIED)
+│   ├── Doctor.java                      # Doctor with login credentials
+│   ├── InventoryItem.java               # Medicine/supply item
+│   └── EmergencyRequest.java            # ER request (PENDING/DISPATCHED/RESOLVED)
 ├── simulator/
-│   ├── VitalsSimulator.java         # ScheduledExecutorService per patient
-│   ├── VitalSignGenerator.java      # Generates HR/SpO2 readings (Runnable)
-│   ├── VitalSignListener.java       # Callback interface (sensor-agnostic)
-│   └── VitalSignValidator.java      # Range + critical threshold checks
+│   ├── VitalsSimulator.java             # ScheduledExecutorService per patient
+│   ├── VitalSignGenerator.java          # Generates HR/SpO2 readings (Runnable)
+│   ├── VitalSignListener.java           # Callback interface (sensor-agnostic)
+│   └── VitalSignValidator.java          # Range + critical threshold checks
 ├── triage/
-│   ├── TriageEngine.java            # Priority queue + stability score formula
-│   └── CriticalVitalHandler.java   # Alert logging + triage escalation
+│   ├── TriageEngine.java                # Priority queue + stability score formula
+│   └── CriticalVitalHandler.java        # Alert logging + triage escalation
 ├── records/
-│   └── RecordManager.java          # HashMap (O(1)) + MySQL (JDBC/HikariCP)
+│   └── RecordManager.java               # HashMap (O(1)) + MySQL (JDBC/HikariCP)
 ├── management/
-│   ├── BedManager.java             # Bed allocation / release
-│   └── PatientManager.java         # Admit / discharge coordinator
+│   ├── BedManager.java                  # Bed allocation / release
+│   ├── PatientManager.java              # Admit / discharge coordinator
+│   ├── DoctorManager.java               # Hash Table — doctor CRUD + auth
+│   ├── InventoryManager.java            # TreeMap (BST) — medicine stock
+│   ├── EmergencyRequestManager.java     # ER request lifecycle + DB persistence
+│   └── DischargeSummaryService.java     # Generates patient discharge summary
 ├── exceptions/
 │   ├── CriticalVitalException.java
 │   ├── DatabaseSyncException.java
 │   └── ResourceAllocationException.java
 └── ui/
-    ├── VitaSyncApp.java            # JavaFX Application class
-    ├── DashboardController.java    # Full dashboard with 5 tabs
-    └── AlertStore.java             # Thread-safe ObservableList for alerts
+    ├── VitaSyncApp.java                 # JavaFX Application — shows Login first
+    ├── LoginScreen.java                 # Doctor authentication screen
+    ├── DashboardController.java         # 9-tab dashboard
+    ├── VitalsChartWindow.java           # Live HR/SpO2 line chart popup
+    └── AlertStore.java                  # Thread-safe ObservableList for alerts
 
 src/main/resources/
-├── db.properties                   # MySQL connection config
-├── schema.sql                      # Database schema
-└── logback.xml                     # Logging config → logs/vitasync.log
-
-src/test/java/com/vitasync/
-├── triage/TriageEngineTest.java
-├── triage/CriticalVitalHandlerTest.java
-├── triage/TriageEngineProperties.java   # jqwik property-based tests
-├── simulator/VitalSignValidatorTest.java
-├── simulator/VitalSignGeneratorTest.java
-├── simulator/VitalsSimulatorTest.java
-├── model/PatientRecordTest.java
-├── model/PatientPriorityTest.java
-└── records/RecordManagerIntegrationTest.java  # H2 in-memory DB
+├── db.properties                        # MySQL connection config
+├── schema.sql                           # Full database schema
+└── logback.xml                          # Logging → logs/vitasync.log
 ```
+
+---
+
+## Dashboard Tabs
+
+| Tab | Description |
+|-----|-------------|
+| 📋 Live Monitor | Real-time HR, SpO2, status, bed per patient. Search/filter bar. Graph + ER Request buttons |
+| 🚨 Emergency Triage | Patients ranked by stability score (most critical first) with NEWS2 risk |
+| 🛏 Bed Manager | All 20 beds with FREE/OCCUPIED status |
+| 👤 Admissions | Admit new patients with optional doctor assignment; discharge with summary popup |
+| 🩺 Doctors | View all doctors, availability, assigned patient; add new doctors |
+| 💊 Inventory | Medicine/supply stock sorted by ID; add, restock, dispense; low stock highlighted |
+| 🚑 ER Requests | All emergency requests with status tracking; dispatch and resolve actions |
+| 📊 Analytics | Live stat cards, top 5 critical patients, low stock alerts |
+| ⚠ Alert History | Timestamped log of all critical vital events |
 
 ---
 
 ## Tech Stack
 
 | Layer | Technology |
-|---|---|
+|-------|-----------|
 | Language | Java 17 |
 | UI | JavaFX 21 |
-| Database | MySQL 8 + HikariCP 5 (connection pool) |
+| Database | MySQL 8 + HikariCP 5 |
 | DB Access | JDBC (PreparedStatement — SQL injection safe) |
 | Concurrency | ScheduledExecutorService, ConcurrentHashMap, PriorityBlockingQueue |
+| Data Structures | TreeMap (BST), ConcurrentHashMap (Hash Table), PriorityBlockingQueue, FilteredList |
+| Auth | SHA-256 password hashing |
 | Logging | SLF4J + Logback |
 | Build | Maven |
-| Unit Testing | JUnit 5 |
-| Mocking | Mockito 5 |
-| Property Testing | jqwik 1.8.1 |
+| Unit Testing | JUnit 5, Mockito 5, jqwik (property-based) |
 | Integration Testing | H2 in-memory database |
 
 ---
@@ -93,30 +131,30 @@ normalizedSpO2 = SpO2 / 100
 score          = (normalizedHR + normalizedSpO2) / 2
 ```
 
-Score range: `0.0 – 1.0`
-- `< 0.4`  → HIGH criticality (red)
-- `0.4 – 0.65` → MEDIUM (yellow)
-- `> 0.65` → LOW (green)
+Score range: `0.0 – 1.0` — lower = more critical
 
 ---
 
-## Critical Thresholds
+## Critical Thresholds (NEWS2-based)
 
 | Vital | Condition | Label |
-|---|---|---|
+|-------|-----------|-------|
 | Heart Rate < 40 bpm | Bradycardia | CRITICAL |
 | Heart Rate > 140 bpm | Tachycardia | CRITICAL |
 | SpO2 < 90% | Hypoxemia | CRITICAL |
 
 ---
 
-## Dashboard Tabs
+## Database Schema
 
-1. **Patient Vitals** — live HR, SpO2, status, assigned bed per patient
-2. **Triage Queue** — patients ranked by stability score (most critical first)
-3. **Bed Management** — all 20 beds with FREE/OCCUPIED status
-4. **Patient Management** — admit new patients, discharge existing ones
-5. **Critical Alerts** — timestamped log of all critical vital events
+| Table | Purpose |
+|-------|---------|
+| `patients` | Core patient data with current vitals |
+| `vital_sign_history` | Every reading stored for analytics/graphs |
+| `beds` | Bed allocation tracking |
+| `emergency_requests` | ER request lifecycle — PENDING/DISPATCHED/RESOLVED |
+| `doctors` | Doctor credentials and availability |
+| `inventory` | Medicine and supply stock |
 
 ---
 
@@ -124,51 +162,63 @@ Score range: `0.0 – 1.0`
 
 - Java 17+
 - Maven 3.8+
-- MySQL 8 (optional — falls back to in-memory mode if unavailable)
+- MySQL 8 (optional — falls back to in-memory mode)
 
 ---
 
-## Setup
+## Setup & Run
 
-**1. Clone the repo**
+**1. Clone and enter project**
 ```bash
 git clone <your-repo-url>
 cd VITA-SYNC
 ```
 
-**2. Configure database (optional)**
+**2. Run the database schema (PowerShell)**
+```powershell
+Get-Content src/main/resources/schema.sql | & "C:\Program Files\MySQL\MySQL Server 8.0\bin\mysql.exe" -u root -p"yourpassword"
+```
+
+**3. Configure DB credentials**
 
 Edit `src/main/resources/db.properties`:
 ```properties
-db.url=jdbc:mysql://localhost:3306/vitasync
+db.url=jdbc:mysql://localhost:3306/hospital_db
 db.username=root
 db.password=yourpassword
 ```
 
-Run the schema:
-```bash
-mysql -u root -p < src/main/resources/schema.sql
-```
-
-**3. Run the application**
+**4. Run the application**
 ```bash
 mvn javafx:run
 ```
 
-**4. Run tests**
-```bash
-mvn test
-```
+**5. Login with default credentials**
+
+| Username | Password | Specialization |
+|----------|----------|----------------|
+| pramod | pramod123 | Emergency Medicine |
+| aman | aman123 | Cardiology |
+| mohit | mohit123 | Pulmonology |
+| ananya | ananya123 | Neurology |
+| diwakar | diwakar123 | General Surgery |
 
 ---
 
-## Future Hardware Integration
+## Key Workflows
 
-Currently vitals are simulated via `java.util.Random`. For real deployment:
+**Auto Critical Response:**
+When a patient's vitals go CRITICAL → system simultaneously:
+1. Logs alert to Alert History tab
+2. Auto-assigns an available doctor
+3. Creates an ER request in the database (status: PENDING)
+4. Updates triage priority queue
 
-- **Sensor**: MAX30102 (HR + SpO2) connected via I2C to a Raspberry Pi
-- **Bridge**: Raspberry Pi runs a Python Flask server exposing `/vitals/{patientId}`
-- **Integration point**: Replace `VitalSignGenerator` with an HTTP client — `VitalSignListener` interface stays unchanged, rest of the system requires zero modification
+**Manual ER Request:**
+Click "🚑 Request ER" on any WARNING/CRITICAL patient in Live Monitor → creates a DB-backed request visible in the ER Requests tab.
+
+**Discharge Flow:**
+Enter patient ID in Admissions tab → click Discharge → system generates a full summary popup showing avg HR, SpO2, critical event count, assigned doctor, and stay duration — all computed from the `vital_sign_history` table.
 
 ---
 
@@ -180,4 +230,4 @@ Application logs are written to `logs/vitasync.log` via Logback.
 
 ## Authors
 
-VITA-SYNC — Phase 2 Complete
+VITA-SYNC — Evolved from VITAL-CONNECT (3rd Sem C Project) → Full Java Hospital System

@@ -153,13 +153,19 @@ public class RecordManager implements AutoCloseable {
         return new ArrayList<>(activeRecords.values());
     }
 
+    /** Exposes the underlying DataSource for use by other managers (DoctorManager, InventoryManager). */
+    public HikariDataSource getDataSource() {
+        return dataSource;
+    }
+
     // -------------------------------------------------------------------------
     // Private helpers
     // -------------------------------------------------------------------------
 
     private void insertPatientToDb(PatientRecord record) throws SQLException {
         String sql = "INSERT INTO patients (patient_id, name, age, current_heart_rate, current_spo2) " +
-                     "VALUES (?, ?, ?, ?, ?)";
+                     "VALUES (?, ?, ?, ?, ?) " +
+                     "ON DUPLICATE KEY UPDATE name=VALUES(name), age=VALUES(age)";
         try (Connection conn = dataSource.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, record.getPatientId());
@@ -183,6 +189,12 @@ public class RecordManager implements AutoCloseable {
             ps.setString(5, record.getPatientId());
             ps.executeUpdate();
         }
+        // Also persist this reading to vital_sign_history
+        insertVitalHistory(record.getPatientId(),
+                new com.vitasync.model.VitalSignReading(
+                        record.getCurrentHeartRate(),
+                        record.getCurrentSpO2(),
+                        record.getLastUpdated()));
     }
 
     private void insertVitalHistory(String patientId, VitalSignReading reading) throws SQLException {
