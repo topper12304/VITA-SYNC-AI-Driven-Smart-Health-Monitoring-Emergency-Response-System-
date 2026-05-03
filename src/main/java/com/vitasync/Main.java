@@ -68,16 +68,27 @@ public class Main {
                 try { VitalSignValidator.validateAndThrow(patientId, hr, spo2); }
                 catch (CriticalVitalException ex) {
                     criticalHandler.handleCriticalVital(ex, hr, spo2);
-                    // Auto-assign an available doctor when a critical vital is detected
-                    doctorManager.assignDoctorToPatient(patientId).ifPresent(doc ->
-                        log.info("AUTO-ASSIGNED: Dr. {} to critical patient {}", doc.getName(), patientId)
-                    );
-                    // Create an emergency request in DB
-                    erManager.createRequest(patientId,
-                            com.vitasync.model.EmergencyRequest.Priority.CRITICAL,
-                            "AUTO: " + ex.getVitalType() + " = " + ex.getValue() + " (" + ex.getThreshold() + ")",
-                            doctorManager.getAvailableDoctors().stream().findFirst()
-                                    .map(d -> "Dr. " + d.getName()).orElse("Awaiting Assignment"));
+                    // Auto-assign a doctor ONLY if this patient doesn't already have one
+                    boolean alreadyAssigned = doctorManager.getAllDoctors().stream()
+                            .anyMatch(d -> patientId.equals(d.getAssignedPatientId()));
+                    if (!alreadyAssigned) {
+                        doctorManager.assignDoctorToPatient(patientId).ifPresent(doc ->
+                            log.info("AUTO-ASSIGNED: Dr. {} to critical patient {}", doc.getName(), patientId)
+                        );
+                    }
+                    // Create an ER request only if no PENDING request exists for this patient
+                    boolean hasPending = erManager.getPendingRequests().stream()
+                            .anyMatch(r -> patientId.equals(r.getPatientId()));
+                    if (!hasPending) {
+                        erManager.createRequest(patientId,
+                                com.vitasync.model.EmergencyRequest.Priority.CRITICAL,
+                                "AUTO: " + ex.getVitalType() + " = " + ex.getValue() + " (" + ex.getThreshold() + ")",
+                                doctorManager.getAllDoctors().stream()
+                                        .filter(d -> patientId.equals(d.getAssignedPatientId()))
+                                        .findFirst()
+                                        .map(d -> "Dr. " + d.getName())
+                                        .orElse("Awaiting Assignment"));
+                    }
                 } catch (Exception e) {
                     log.error("Validation error for {}: {}", patientId, e.getMessage());
                 }

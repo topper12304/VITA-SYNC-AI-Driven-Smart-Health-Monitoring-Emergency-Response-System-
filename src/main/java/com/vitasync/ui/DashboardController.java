@@ -351,9 +351,12 @@ public class DashboardController {
     }
 
     private void refreshDoctorCombo(ComboBox<String> combo) {
+        // Show ALL doctors with their availability status so user can always see options
         combo.getItems().setAll(
-            doctorManager.getAvailableDoctors().stream()
-                .map(d -> d.getUsername() + " | Dr. " + d.getName() + " (" + d.getSpecialization() + ")")
+            doctorManager.getAllDoctors().stream()
+                .map(d -> d.getUsername() + " | Dr. " + d.getName()
+                        + " (" + d.getSpecialization() + ")"
+                        + (d.isAvailable() ? " ✔" : " — Busy"))
                 .toList()
         );
     }
